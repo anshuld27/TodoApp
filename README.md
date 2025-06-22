@@ -126,8 +126,7 @@ cd TodoApi
 # Restore dependencies
 dotnet restore
 
-# Create and apply database migrations
-dotnet ef migrations add InitialCreate
+# Apply database migrations
 dotnet ef database update
 
 # Run the API (default port: 5000)
