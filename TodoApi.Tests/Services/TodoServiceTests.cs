@@ -2,9 +2,13 @@
 using TodoApi.Data;
 using TodoApi.Models;
 using TodoApi.Services;
+using Microsoft.Extensions.Logging;
 
 namespace TodoApi.Tests.Services
 {
+    /// <summary>
+    /// Unit tests for the TodoService class.
+    /// </summary>
     public class TodoServiceTests : IDisposable
     {
         private readonly AppDbContext _context;
@@ -16,7 +20,10 @@ namespace TodoApi.Tests.Services
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
                 .Options;
             _context = new AppDbContext(options);
-            _service = new TodoService(_context);
+
+            // Use a mock logger to satisfy TodoService's constructor
+            var logger = new LoggerFactory().CreateLogger<TodoService>();
+            _service = new TodoService(_context, logger);
         }
 
         public void Dispose() => _context.Dispose();
@@ -24,7 +31,7 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task CreateTodo_ShouldAddValidTodo()
         {
-            // Arrange
+            // Arrange: Prepare a valid DTO
             var dto = new CreateTodoDto
             {
                 Title = "A valid todo title",
@@ -34,7 +41,7 @@ namespace TodoApi.Tests.Services
             // Act
             var result = await _service.CreateTodo(dto);
 
-            // Assert
+            // Assert: The todo should be added and match the input
             Assert.NotNull(result);
             Assert.Equal("A valid todo title", result.Title);
             Assert.False(result.IsCompleted);
@@ -44,49 +51,49 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task CreateTodo_ShouldRejectShortTitle()
         {
-            // Arrange
+            // Arrange: Title too short
             var dto = new CreateTodoDto
             {
                 Title = "Short",
                 IsCompleted = false
             };
 
-            // Act & Assert
+            // Act & Assert: Should throw validation exception
             await Assert.ThrowsAsync<ArgumentException>(() => _service.CreateTodo(dto));
         }
 
         [Fact]
         public async Task CreateTodo_ShouldRejectNullTitle()
         {
-            // Arrange
+            // Arrange: Title is null
             var dto = new CreateTodoDto
             {
                 Title = null,
                 IsCompleted = false
             };
 
-            // Act & Assert
+            // Act & Assert: Should throw null argument exception
             await Assert.ThrowsAsync<ArgumentNullException>(() => _service.CreateTodo(dto));
         }
 
         [Fact]
         public async Task CreateTodo_ShouldRejectTooLongTitle()
         {
-            // Arrange
+            // Arrange: Title exceeds max length
             var dto = new CreateTodoDto
             {
                 Title = new string('a', 1001),
                 IsCompleted = false
             };
 
-            // Act & Assert
+            // Act & Assert: Should throw validation exception
             await Assert.ThrowsAsync<ArgumentException>(() => _service.CreateTodo(dto));
         }
 
         [Fact]
         public async Task UpdateTodo_ShouldUpdateTitle()
         {
-            // Arrange
+            // Arrange: Add a todo and prepare update DTO
             var todo = new Todo { Title = "Original Title", IsCompleted = false };
             _context.Todos.Add(todo);
             await _context.SaveChangesAsync();
@@ -97,7 +104,7 @@ namespace TodoApi.Tests.Services
             await _service.UpdateTodo(todo.Id, dto);
             var result = await _context.Todos.FindAsync(todo.Id);
 
-            // Assert
+            // Assert: Title should be updated
             Assert.NotNull(result);
             Assert.Equal("Updated Title", result.Title);
             Assert.False(result.IsCompleted);
@@ -106,7 +113,7 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task UpdateTodo_ShouldUpdateStatus()
         {
-            // Arrange
+            // Arrange: Add a todo and prepare update DTO
             var todo = new Todo { Title = "Test", IsCompleted = false };
             _context.Todos.Add(todo);
             await _context.SaveChangesAsync();
@@ -117,7 +124,7 @@ namespace TodoApi.Tests.Services
             await _service.UpdateTodo(todo.Id, dto);
             var result = await _context.Todos.FindAsync(todo.Id);
 
-            // Assert
+            // Assert: Status should be updated
             Assert.NotNull(result);
             Assert.True(result.IsCompleted);
             Assert.Equal("Test", result.Title);
@@ -126,45 +133,45 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task UpdateTodo_ShouldRejectShortTitle()
         {
-            // Arrange
+            // Arrange: Add a todo and prepare invalid update DTO
             var todo = new Todo { Title = "Original Title", IsCompleted = false };
             _context.Todos.Add(todo);
             await _context.SaveChangesAsync();
 
             var dto = new UpdateTodoDto { Title = "Short" };
 
-            // Act & Assert
+            // Act & Assert: Should throw validation exception
             await Assert.ThrowsAsync<ArgumentException>(() => _service.UpdateTodo(todo.Id, dto));
         }
 
         [Fact]
         public async Task UpdateTodo_ShouldRejectTooLongTitle()
         {
-            // Arrange
+            // Arrange: Add a todo and prepare invalid update DTO
             var todo = new Todo { Title = "Original Title", IsCompleted = false };
             _context.Todos.Add(todo);
             await _context.SaveChangesAsync();
 
             var dto = new UpdateTodoDto { Title = new string('a', 1001) };
 
-            // Act & Assert
+            // Act & Assert: Should throw validation exception
             await Assert.ThrowsAsync<ArgumentException>(() => _service.UpdateTodo(todo.Id, dto));
         }
 
         [Fact]
         public async Task UpdateTodo_ShouldRejectNonexistentTodo()
         {
-            // Arrange
+            // Arrange: Use a non-existent ID
             var dto = new UpdateTodoDto { Title = "Updated Title" };
 
-            // Act & Assert
+            // Act & Assert: Should throw not found exception
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.UpdateTodo(999, dto));
         }
 
         [Fact]
         public async Task DeleteTodo_ShouldRemoveTodo()
         {
-            // Arrange
+            // Arrange: Add a todo to be deleted
             var todo = new Todo { Title = "To Delete", IsCompleted = false };
             _context.Todos.Add(todo);
             await _context.SaveChangesAsync();
@@ -173,31 +180,31 @@ namespace TodoApi.Tests.Services
             await _service.DeleteTodo(todo.Id);
             var result = await _context.Todos.FindAsync(todo.Id);
 
-            // Assert
+            // Assert: Todo should be removed
             Assert.Null(result);
         }
 
         [Fact]
         public async Task DeleteTodo_ShouldThrowIfNotFound()
         {
-            // Act & Assert
+            // Act & Assert: Should throw not found exception for missing ID
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.DeleteTodo(999));
         }
 
         [Fact]
         public async Task GetAllTodos_ShouldReturnPaginatedResults()
         {
-            // Arrange
+            // Arrange: Add 15 todos
             for (int i = 1; i <= 15; i++)
             {
                 _context.Todos.Add(new Todo { Title = $"Todo {i:00}", IsCompleted = false });
             }
             await _context.SaveChangesAsync();
 
-            // Act
+            // Act: Get page 2 with 5 items per page
             var result = await _service.GetAllTodos(2, 5);
 
-            // Assert
+            // Assert: Should return correct page and items
             Assert.Equal(2, result.PageNumber);
             Assert.Equal(5, result.PageSize);
             Assert.Equal(15, result.TotalCount);
@@ -209,16 +216,16 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task GetAllTodos_ShouldFilterActiveTasks()
         {
-            // Arrange
+            // Arrange: Add active and completed todos
             _context.Todos.Add(new Todo { Title = "Active 1", IsCompleted = false });
             _context.Todos.Add(new Todo { Title = "Active 2", IsCompleted = false });
             _context.Todos.Add(new Todo { Title = "Completed", IsCompleted = true });
             await _context.SaveChangesAsync();
 
-            // Act
+            // Act: Filter for active todos
             var result = await _service.GetAllTodos(1, 10, "active");
 
-            // Assert
+            // Assert: Only active todos should be returned
             Assert.Equal(2, result.Items.Count);
             Assert.All(result.Items, item => Assert.False(item.IsCompleted));
         }
@@ -226,16 +233,16 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task GetAllTodos_ShouldFilterCompletedTasks()
         {
-            // Arrange
+            // Arrange: Add active and completed todos
             _context.Todos.Add(new Todo { Title = "Active", IsCompleted = false });
             _context.Todos.Add(new Todo { Title = "Completed 1", IsCompleted = true });
             _context.Todos.Add(new Todo { Title = "Completed 2", IsCompleted = true });
             await _context.SaveChangesAsync();
 
-            // Act
+            // Act: Filter for completed todos
             var result = await _service.GetAllTodos(1, 10, "completed");
 
-            // Assert
+            // Assert: Only completed todos should be returned
             Assert.Equal(2, result.Items.Count);
             Assert.All(result.Items, item => Assert.True(item.IsCompleted));
         }
@@ -243,10 +250,10 @@ namespace TodoApi.Tests.Services
         [Fact]
         public async Task GetAllTodos_ShouldReturnEmptyIfNoTodos()
         {
-            // Act
+            // Act: No todos in DB
             var result = await _service.GetAllTodos(1, 10);
 
-            // Assert
+            // Assert: Should return empty result
             Assert.Empty(result.Items);
             Assert.Equal(0, result.TotalCount);
             Assert.Equal(0, result.TotalPages);
