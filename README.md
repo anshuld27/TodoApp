@@ -111,7 +111,13 @@ TodoApp/
 
 ## Setup and Running
 
-### 1. Backend Setup
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/anshuld27/TodoApp.git
+```
+
+### 2. Backend Setup
 
 ```bash
 # Navigate to backend directory
@@ -131,7 +137,7 @@ dotnet run
 
 ---
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 ```bash
 # Navigate to frontend directory
@@ -266,4 +272,4 @@ npm test
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License.
